@@ -1,0 +1,2234 @@
+if _G.EggESP then
+    _G.EggESP.Running = false
+    _G.EggESP.AutoFarmEnabled = false
+    _G.EggESP.RadarEnabled = false
+    if _G.EggESP.RadarConnection then
+        pcall(function()
+            _G.EggESP.RadarConnection:Disconnect()
+        end)
+    end
+    if _G.EggESP.RadarUpdateThread then
+        pcall(task.cancel, _G.EggESP.RadarUpdateThread)
+    end
+    if _G.EggESP.RadarThread then
+        pcall(function()
+            _G.EggESP.RadarThread:Disconnect()
+        end)
+    end
+    if _G.EggESP.RadarOverhead then
+        pcall(function()
+            _G.EggESP.RadarOverhead:Destroy()
+        end)
+    end
+    if _G.EggESP.RadarArrow then
+        pcall(function()
+            _G.EggESP.RadarArrow:Destroy()
+        end)
+    end
+    if _G.EggESP.Connections then
+        for _, connection in pairs(_G.EggESP.Connections) do
+            pcall(function()
+                connection:Disconnect()
+            end)
+        end
+    end
+    if _G.EggESP.UpdateThread then
+        pcall(task.cancel, _G.EggESP.UpdateThread)
+    end
+    if _G.EggESP.ESPScanThread then
+        pcall(task.cancel, _G.EggESP.ESPScanThread)
+    end
+    if _G.EggESP.AutoFarmThread then
+        pcall(task.cancel, _G.EggESP.AutoFarmThread)
+    end
+    if _G.EggESP.FarmStatusThread then
+        pcall(task.cancel, _G.EggESP.FarmStatusThread)
+    end
+    if _G.EggESP.PetSpeedThread then
+        pcall(task.cancel, _G.EggESP.PetSpeedThread)
+    end
+    if _G.EggESP.PetPhysicsThread then
+        pcall(task.cancel, _G.EggESP.PetPhysicsThread)
+    end
+    if _G.EggESP.PetEnabled and _G.EggESP.PetRestoreCharacter then
+        pcall(function()
+            local humanoid = _G.EggESP.PetRestoreCharacter:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                if _G.EggESP.PetRestoreWalkSpeed then
+                    humanoid.WalkSpeed = _G.EggESP.PetRestoreWalkSpeed
+                end
+                if _G.EggESP.PetRestoreUseJumpPower ~= nil then
+                    humanoid.UseJumpPower = _G.EggESP.PetRestoreUseJumpPower
+                end
+                if _G.EggESP.PetRestoreJumpPower then
+                    humanoid.JumpPower = _G.EggESP.PetRestoreJumpPower
+                end
+                if _G.EggESP.PetRestoreJumpHeight then
+                    humanoid.JumpHeight = _G.EggESP.PetRestoreJumpHeight
+                end
+            end
+        end)
+    end
+    if _G.EggESP.AutoFarmMovementOverride and type(_G.EggESP.TeleportToPlot) == "function" then
+        pcall(_G.EggESP.TeleportToPlot)
+    end
+    pcall(function()
+        game:GetService("ContextActionService"):UnbindAction("DiabloHub_AutoFarmMovementLock")
+    end)
+    if type(_G.EggESP.SetAutoFarmRunningState) == "function" then
+        pcall(_G.EggESP.SetAutoFarmRunningState, false)
+    end
+    if type(_G.EggESP.SetAutoFarmPlayerControls) == "function" then
+        pcall(_G.EggESP.SetAutoFarmPlayerControls, false)
+    end
+    if type(_G.EggESP.SetAutoFarmNoclip) == "function" then
+        pcall(_G.EggESP.SetAutoFarmNoclip, false)
+    end
+    if _G.EggESP.AutoFarmReturnPad then
+        pcall(function()
+            _G.EggESP.AutoFarmReturnPad:Destroy()
+        end)
+    end
+    if _G.EggESP.AutoFarmMovementOverride and _G.EggESP.AutoFarmOriginalWalkSpeed then
+        pcall(function()
+            local character = _G.EggESP.LocalPlayer and _G.EggESP.LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                humanoid.WalkSpeed = _G.EggESP.AutoFarmOriginalWalkSpeed
+                if _G.EggESP.AutoFarmOriginalAutoRotate ~= nil then
+                    humanoid.AutoRotate = _G.EggESP.AutoFarmOriginalAutoRotate
+                end
+            end
+        end)
+    end
+end
+
+_G.EggESP = {}
+
+_G.EggESP.Players = game:GetService("Players")
+_G.EggESP.UserInputService = game:GetService("UserInputService")
+_G.EggESP.ReplicatedStorage = game:GetService("ReplicatedStorage")
+_G.EggESP.CoreGui = game:GetService("CoreGui")
+_G.EggESP.RunService = game:GetService("RunService")
+_G.EggESP.CollectionService = game:GetService("CollectionService")
+_G.EggESP.LocalPlayer = _G.EggESP.Players.LocalPlayer
+_G.EggESP.PlayerGui = _G.EggESP.LocalPlayer:WaitForChild("PlayerGui")
+_G.EggESP.RenderedEggs = workspace:WaitForChild("RenderedEggs")
+_G.EggESP.Plots = workspace:WaitForChild("Plots")
+
+_G.EggESP.Running = true
+_G.EggESP.ESPEnabled = false
+_G.EggESP.ESPs = {}
+_G.EggESP.AutoFarmEnabled = false
+_G.EggESP.AutoFarmEggs = {}
+_G.EggESP.AutoFarmLookup = {}
+_G.EggESP.AutoFarmBusy = false
+_G.EggESP.AutoFarmCount = 0
+_G.EggESP.AutoFarmLastTarget = "None"
+_G.EggESP.AutoFarmState = "Disabled"
+_G.EggESP.AutoFarmCheckRate = 0.1
+_G.EggESP.AutoFarmCollectTimeout = 1.5
+_G.EggESP.AutoFarmPromptInterval = 0.03
+_G.EggESP.AutoFarmWalkSpeed = 350
+_G.EggESP.AutoFarmReturnMethod = "Wait"
+_G.EggESP.AutoFarmPadHeight = 60
+_G.EggESP.AutoFarmReturnPad = nil
+_G.EggESP.AutoFarmNoclipParts = {}
+_G.EggESP.AutoFarmWHeld = false
+_G.EggESP.AutoFarmPlayerControls = nil
+_G.EggESP.AutoFarmInputLocked = false
+_G.EggESP.AutoFarmMovementOverride = false
+_G.EggESP.AutoFarmOriginalWalkSpeed = nil
+_G.EggESP.AutoFarmOriginalAutoRotate = nil
+_G.EggESP.AutoFarmMountSelection = "Auto"
+_G.EggESP.AutoFarmMountReady = false
+_G.EggESP.AutoFarmMountTool = nil
+_G.EggESP.PetEnabled = false
+_G.EggESP.PetSpeed = 16
+_G.EggESP.PetJumpHeight = 7.2
+_G.EggESP.PetInstantMovement = false
+_G.EggESP.PetRestoreCharacter = nil
+_G.EggESP.PetRestoreWalkSpeed = nil
+_G.EggESP.PetRestoreUseJumpPower = nil
+_G.EggESP.PetRestoreJumpPower = nil
+_G.EggESP.PetRestoreJumpHeight = nil
+_G.EggESP.LastLiveText = ""
+_G.EggESP.LastFarmStatus = ""
+_G.EggESP.DistanceRate = 0.1
+_G.EggESP.ESPScanRate = 0.35
+_G.EggESP.Connections = {}
+_G.EggESP.EggData = {}
+_G.EggESP.EggNames = {"None"}
+_G.EggESP.RadarEnabled = false
+_G.EggESP.RadarEgg = "None"
+_G.EggESP.RadarTarget = nil
+_G.EggESP.RadarOverhead = nil
+_G.EggESP.RadarArrow = nil
+_G.EggESP.RadarLastDistance = nil
+_G.EggESP.RadarTargetCheck = 0
+_G.EggESP.RadarTrend = nil
+_G.EggESP.RarityOrder = {
+    Common = 1,
+    Rare = 2,
+    Epic = 3,
+    Legendary = 4,
+    Mythic = 5,
+    Divine = 6,
+    Ethereal = 7
+}
+_G.EggESP.RarityColors = {
+    Common = Color3.fromRGB(190, 190, 190),
+    Rare = Color3.fromRGB(80, 150, 255),
+    Epic = Color3.fromRGB(180, 80, 255),
+    Legendary = Color3.fromRGB(255, 190, 60),
+    Mythic = Color3.fromRGB(255, 70, 70),
+    Divine = Color3.fromRGB(255, 100, 220),
+    Ethereal = Color3.fromRGB(100, 255, 255)
+}
+pcall(function()
+    _G.EggESP.EggData = require(
+        _G.EggESP.ReplicatedStorage:WaitForChild("GameData"):WaitForChild("Eggs")
+   )
+end)
+for name in pairs(_G.EggESP.EggData) do
+    table.insert(_G.EggESP.EggNames, name)
+end
+table.sort(_G.EggESP.EggNames, function(a, b)
+    if a == "None" then
+        return true
+    end
+    if b == "None" then
+        return false
+    end
+    local da = _G.EggESP.EggData[a]
+    local db = _G.EggESP.EggData[b]
+    local ra = _G.EggESP.RarityOrder[da and da.Rarity] or 999
+    local rb = _G.EggESP.RarityOrder[db and db.Rarity] or 999
+    if ra == rb then
+        return a < b
+    end
+    return ra < rb
+end)
+if _G.EggESP.PlayerGui:FindFirstChild("RenderedEggsESP_GUI") then
+    _G.EggESP.PlayerGui.RenderedEggsESP_GUI:Destroy()
+end
+function _G.EggESP.GetRoot(model)
+    if not model or not model:IsA("Model") then
+        return nil
+    end
+    if model.PrimaryPart and model.PrimaryPart:IsA("BasePart") then
+        return model.PrimaryPart
+    end
+
+    local prompt = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+    if prompt then
+        local parent = prompt.Parent
+        if parent and parent:IsA("BasePart") then
+            return parent
+        end
+    end
+
+    return model:FindFirstChildWhichIsA("BasePart", true)
+end
+function _G.EggESP.GetRarity(name)
+    local data = _G.EggESP.EggData[name]
+    return data and data.Rarity or "Unknown"
+end
+function _G.EggESP.GetColor(name)
+    return _G.EggESP.RarityColors[_G.EggESP.GetRarity(name)] or Color3.new(1, 1, 1)
+end
+function _G.EggESP.IsRenderedEgg(model)
+    if not model or not model.Parent or not model:IsA("Model") then
+        return false
+    end
+    if _G.EggESP.EggData[model.Name] then
+        return true
+    end
+
+    for _, object in ipairs(model:GetDescendants()) do
+        if object:IsA("ProximityPrompt") then
+            return _G.EggESP.EggData[model.Name] ~= nil
+        end
+    end
+
+    return false
+end
+
+function _G.EggESP.RemoveESP(model)
+    local data = _G.EggESP.ESPs[model]
+    if not data then
+        return
+    end
+    if data.Billboard then
+        pcall(function()
+            data.Billboard:Destroy()
+        end)
+    end
+    _G.EggESP.ESPs[model] = nil
+end
+function _G.EggESP.CreateESP(model)
+    if not _G.EggESP.Running or not _G.EggESP.IsRenderedEgg(model) then
+        return
+    end
+    if _G.EggESP.ESPs[model] then
+        return
+    end
+    local part = _G.EggESP.GetRoot(model)
+    if not part then
+        return
+    end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "EggESP"
+    billboard.Adornee = part
+    billboard.Size = UDim2.fromOffset(190, 42)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.MaxDistance = 100000
+    billboard.Enabled = _G.EggESP.ESPEnabled
+    billboard.Parent = _G.EggESP.PlayerGui
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.TextColor3 = _G.EggESP.GetColor(model.Name)
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.Text = model.Name
+    label.Parent = billboard
+    _G.EggESP.ESPs[model] = {
+        Part = part,
+        Billboard = billboard,
+        Label = label
+    }
+end
+function _G.EggESP.TeleportToEgg(model)
+    if not model or not model.Parent then
+        return false
+    end
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not character or not root then
+        return false
+    end
+    local cframe, size = model:GetBoundingBox()
+    local target = Vector3.new(
+        cframe.Position.X,
+        cframe.Position.Y + size.Y / 2 + 3,
+        cframe.Position.Z
+   )
+    -- Use root-part coordinates so the character model pivot cannot shift the
+    -- teleport sideways relative to the egg or the return runway.
+    if type(_G.EggESP.TeleportRootToPosition) == "function" then
+        if not _G.EggESP.TeleportRootToPosition(target) then
+            return false
+        end
+    else
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        character:PivotTo(CFrame.new(target))
+    end
+
+    task.defer(function()
+        local currentCharacter = _G.EggESP.LocalPlayer.Character
+        local currentRoot = currentCharacter and currentCharacter:FindFirstChild("HumanoidRootPart")
+        if currentRoot then
+            currentRoot.AssemblyLinearVelocity = Vector3.zero
+            currentRoot.AssemblyAngularVelocity = Vector3.zero
+        end
+    end)
+    return true
+end
+function _G.EggESP.GetAllEggModels()
+    local result = {}
+    local seen = {}
+    for _, object in ipairs(_G.EggESP.RenderedEggs:GetDescendants()) do
+        if object:IsA("Model") and not seen[object] and _G.EggESP.IsRenderedEgg(object) then
+            seen[object] = true
+            table.insert(result, object)
+        end
+    end
+    return result
+end
+
+function _G.EggESP.ScanOnce()
+    if not _G.EggESP.Running or not _G.EggESP.RenderedEggs then
+        return
+    end
+
+    local live = {}
+    for _, model in ipairs(_G.EggESP.GetAllEggModels()) do
+        live[model] = true
+        _G.EggESP.CreateESP(model)
+    end
+
+    for model in pairs(_G.EggESP.ESPs) do
+        if not live[model] or not _G.EggESP.IsRenderedEgg(model) then
+            _G.EggESP.RemoveESP(model)
+        end
+    end
+end
+function _G.EggESP.FindNearestEgg(name)
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        return nil
+    end
+    local nearest = nil
+    local nearestDistance = math.huge
+    for model, data in pairs(_G.EggESP.ESPs) do
+        if model.Parent and model.Name == name and data.Part and data.Part.Parent then
+            local distance = (root.Position - data.Part.Position).Magnitude
+            if distance < nearestDistance then
+                nearestDistance = distance
+                nearest = model
+            end
+        end
+    end
+    return nearest
+end
+
+function _G.EggESP.SetAutoFarmSelection(options)
+    table.clear(_G.EggESP.AutoFarmEggs)
+    table.clear(_G.EggESP.AutoFarmLookup)
+
+    if type(options) == "string" then
+        options = {options}
+    end
+
+    if type(options) ~= "table" then
+        _G.EggESP.AutoFarmState = "No eggs selected"
+        return
+    end
+
+    for _, name in ipairs(options) do
+        if type(name) == "string" and name ~= "None" and _G.EggESP.EggData[name] then
+            table.insert(_G.EggESP.AutoFarmEggs, name)
+            _G.EggESP.AutoFarmLookup[name] = true
+        end
+    end
+
+    if #_G.EggESP.AutoFarmEggs == 0 then
+        _G.EggESP.AutoFarmState = "No eggs selected"
+    elseif _G.EggESP.AutoFarmEnabled then
+        _G.EggESP.AutoFarmState = "Searching"
+    else
+        _G.EggESP.AutoFarmState = "Ready"
+    end
+end
+
+function _G.EggESP.FindAutoFarmEgg()
+    if #_G.EggESP.AutoFarmEggs == 0 then
+        return nil
+    end
+
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        return nil
+    end
+
+    for _, name in ipairs(_G.EggESP.AutoFarmEggs) do
+        local egg = _G.EggESP.FindNearestEgg(name)
+        if egg then
+            return egg
+        end
+    end
+
+    return nil
+end
+
+function _G.EggESP.GetPlotReturnCFrame()
+    local character = _G.EggESP.LocalPlayer and _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+
+    for _, plot in ipairs(_G.EggESP.Plots:GetChildren()) do
+        local data = plot:FindFirstChild("Data")
+        local owner = data and data:FindFirstChild("Owner")
+        local baseplate = plot:FindFirstChild("Baseplate")
+
+        if owner and baseplate and baseplate:IsA("BasePart") and owner.Value == _G.EggESP.LocalPlayer then
+            -- Return the ROOT position above the actual top face, not the Model pivot
+            -- and not the baseplate's center. The runway and final teleport use this same point.
+            local topCenter = baseplate.CFrame:PointToWorldSpace(Vector3.new(0, baseplate.Size.Y / 2, 0))
+            local rootClearance = root and humanoid
+                and (root.Size.Y * 0.5 + humanoid.HipHeight + 0.25)
+                or 4
+            local targetPosition = topCenter + Vector3.new(0, math.max(3, rootClearance), 0)
+            return CFrame.new(targetPosition) * baseplate.CFrame.Rotation
+        end
+    end
+
+    return nil
+end
+function _G.EggESP.SetAutoFarmNoclip(enabled)
+    local player = _G.EggESP.LocalPlayer
+    local character = player and player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local originals = _G.EggESP.AutoFarmNoclipParts
+
+    if enabled then
+        local seen = {}
+        local function disableCollision(object)
+            if object and object:IsA("BasePart") and not seen[object] then
+                seen[object] = true
+                if originals[object] == nil then
+                    originals[object] = object.CanCollide
+                end
+                object.CanCollide = false
+            end
+        end
+
+        -- Player parts.
+        if character then
+            for _, object in ipairs(character:GetDescendants()) do
+                disableCollision(object)
+            end
+        end
+
+        -- The mount can be a separate welded assembly or a model containing the seat.
+        if root then
+            pcall(function()
+                for _, object in ipairs(root:GetConnectedParts(true)) do
+                    disableCollision(object)
+                end
+            end)
+        end
+
+        local seat = humanoid and humanoid.SeatPart
+        if seat then
+            disableCollision(seat)
+            pcall(function()
+                for _, object in ipairs(seat:GetConnectedParts(true)) do
+                    disableCollision(object)
+                end
+            end)
+            local mountModel = seat:FindFirstAncestorOfClass("Model")
+            if mountModel and mountModel ~= character then
+                for _, object in ipairs(mountModel:GetDescendants()) do
+                    disableCollision(object)
+                end
+            end
+        end
+        return
+    end
+
+    for object, canCollide in pairs(originals) do
+        if object and object.Parent then
+            pcall(function()
+                object.CanCollide = canCollide
+            end)
+        end
+    end
+    table.clear(originals)
+end
+function _G.EggESP.SetAutoFarmRunningState(enabled)
+    local character = _G.EggESP.LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local contextActions = game:GetService("ContextActionService")
+    local inputLockName = "DiabloHub_AutoFarmMovementLock"
+
+    if enabled then
+        _G.EggESP.SetAutoFarmPlayerControls(true)
+        if not _G.EggESP.AutoFarmInputLocked then
+            local function sinkMovementInput()
+                return Enum.ContextActionResult.Sink
+            end
+            pcall(function()
+                contextActions:BindActionAtPriority(
+                    inputLockName,
+                    sinkMovementInput,
+                    false,
+                    Enum.ContextActionPriority.High.Value + 100,
+                    Enum.KeyCode.W,
+                    Enum.KeyCode.A,
+                    Enum.KeyCode.S,
+                    Enum.KeyCode.D,
+                    Enum.KeyCode.Up,
+                    Enum.KeyCode.Down,
+                    Enum.KeyCode.Left,
+                    Enum.KeyCode.Right
+                )
+            end)
+            _G.EggESP.AutoFarmInputLocked = true
+        end
+
+        -- Create a running animation/state without letting injected or physical
+        -- W/A/S/D keys decide the actual direction of travel.
+        _G.EggESP.AutoFarmWHeld = false
+        if humanoid then
+            pcall(function()
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end)
+        end
+        return
+    end
+
+    if _G.EggESP.AutoFarmInputLocked then
+        pcall(function()
+            contextActions:UnbindAction(inputLockName)
+        end)
+    end
+    _G.EggESP.AutoFarmInputLocked = false
+    _G.EggESP.AutoFarmWHeld = false
+    _G.EggESP.SetAutoFarmPlayerControls(false)
+
+    if humanoid then
+        pcall(function()
+            humanoid:Move(Vector3.zero, false)
+        end)
+    end
+end
+
+function _G.EggESP.SetAutoFarmPlayerControls(disabled)
+    if disabled then
+        if _G.EggESP.AutoFarmPlayerControls then
+            return true
+        end
+
+        local player = _G.EggESP.LocalPlayer
+        local playerScripts = player and player:FindFirstChild("PlayerScripts")
+        local moduleScript = playerScripts and playerScripts:FindFirstChild("PlayerModule")
+        if not moduleScript and playerScripts then
+            pcall(function()
+                moduleScript = playerScripts:WaitForChild("PlayerModule", 2)
+            end)
+        end
+        if not moduleScript then
+            return false
+        end
+
+        local ok, playerModule = pcall(require, moduleScript)
+        if not ok or type(playerModule) ~= "table" or type(playerModule.GetControls) ~= "function" then
+            return false
+        end
+
+        local controlsOk, controls = pcall(function()
+            return playerModule:GetControls()
+        end)
+        if not controlsOk or not controls then
+            return false
+        end
+
+        local disabledOk = pcall(function()
+            controls:Disable()
+        end)
+        if disabledOk then
+            _G.EggESP.AutoFarmPlayerControls = controls
+            return true
+        end
+        return false
+    end
+
+    local controls = _G.EggESP.AutoFarmPlayerControls
+    _G.EggESP.AutoFarmPlayerControls = nil
+    if controls then
+        pcall(function()
+            controls:Enable()
+        end)
+    end
+    return true
+end
+function _G.EggESP.GetAutoFarmMountName(tool)
+    if not tool then
+        return ""
+    end
+
+    local petName = tool:GetAttribute("PetName")
+    if type(petName) == "string" and petName ~= "" then
+        return petName
+    end
+
+    return (string.gsub(tool.Name, "%s*%[.*$", ""))
+end
+
+function _G.EggESP.GetAutoFarmMountTools()
+    local player = _G.EggESP.LocalPlayer
+    local results = {}
+    local seen = {}
+    local backpack = player and player:FindFirstChildOfClass("Backpack")
+    local character = player and player.Character
+
+    local function collect(container)
+        if not container then
+            return
+        end
+
+        for _, object in ipairs(container:GetChildren()) do
+            if object:IsA("Tool") then
+                local tagged = false
+                pcall(function()
+                    tagged = _G.EggESP.CollectionService:HasTag(object, "Pet")
+                end)
+
+                if tagged and not seen[object] then
+                    seen[object] = true
+                    table.insert(results, object)
+                end
+            end
+        end
+    end
+
+    collect(backpack)
+    collect(character)
+    table.sort(results, function(a, b)
+        return a.Name < b.Name
+    end)
+    return results
+end
+
+function _G.EggESP.FindAutoFarmMountTool()
+    local options = _G.EggESP.GetAutoFarmMountTools()
+    local selected = _G.EggESP.AutoFarmMountSelection or "Auto"
+    local petData = nil
+
+    pcall(function()
+        petData = require(_G.EggESP.ReplicatedStorage:WaitForChild("GameData"):WaitForChild("Pets"))
+    end)
+
+    local bestTool = nil
+    local bestScore = -math.huge
+
+    for _, tool in ipairs(options) do
+        local baseName = _G.EggESP.GetAutoFarmMountName(tool)
+        if selected == "Auto" or selected == tool.Name or selected == baseName then
+            local data = type(petData) == "table" and petData[baseName] or nil
+            local score = type(data) == "table" and tonumber(data.Income) or 0
+            if not bestTool or score > bestScore then
+                bestTool = tool
+                bestScore = score
+            end
+        end
+    end
+
+    return bestTool
+end
+
+function _G.EggESP.IsAutoFarmMounted()
+    local player = _G.EggESP.LocalPlayer
+    return player and (player:GetAttribute("IsRiding") == true or player:GetAttribute("IsPassenger") == true) or false
+end
+
+function _G.EggESP.FireMountingRemote()
+    local remote
+    local ok = pcall(function()
+        remote = _G.EggESP.ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Game"):WaitForChild("Mounting")
+    end)
+    if not ok or not remote or not remote:IsA("RemoteEvent") then
+        return false
+    end
+
+    return pcall(function()
+        remote:FireServer()
+    end)
+end
+
+function _G.EggESP.EnsureAutoFarmMounted()
+    -- If any mount is already active, keep riding it. Do not repeatedly fire
+    -- the Mounting remote on each farm cycle.
+    if _G.EggESP.IsAutoFarmMounted() then
+        _G.EggESP.AutoFarmMountReady = true
+        return true
+    end
+
+    local player = _G.EggESP.LocalPlayer
+    local character = player and player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local tool = _G.EggESP.FindAutoFarmMountTool()
+
+    if not character or not humanoid or not tool then
+        _G.EggESP.AutoFarmMountReady = false
+        _G.EggESP.AutoFarmState = "No Pet-tagged mount tool found"
+        return false
+    end
+
+    _G.EggESP.AutoFarmMountTool = tool
+    if tool.Parent ~= character then
+        local equipped = pcall(function()
+            humanoid:EquipTool(tool)
+        end)
+        if not equipped then
+            _G.EggESP.AutoFarmState = "Could not equip mount"
+            return false
+        end
+
+        local equipDeadline = os.clock() + 1.5
+        while _G.EggESP.Running and tool.Parent ~= character and os.clock() < equipDeadline do
+            task.wait(0.05)
+            character = player.Character
+            if not character then
+                return false
+            end
+        end
+    end
+
+    if tool.Parent ~= character then
+        _G.EggESP.AutoFarmState = "Mount equip timed out"
+        _G.EggESP.AutoFarmMountReady = false
+        return false
+    end
+
+    _G.EggESP.AutoFarmState = "Mounting " .. _G.EggESP.GetAutoFarmMountName(tool)
+    if not _G.EggESP.FireMountingRemote() then
+        _G.EggESP.AutoFarmState = "Mounting remote failed"
+        _G.EggESP.AutoFarmMountReady = false
+        return false
+    end
+
+    local mountDeadline = os.clock() + 2.5
+    while _G.EggESP.Running and os.clock() < mountDeadline do
+        if _G.EggESP.IsAutoFarmMounted() then
+            _G.EggESP.AutoFarmMountReady = true
+            return true
+        end
+        task.wait(0.05)
+    end
+
+    _G.EggESP.AutoFarmMountReady = false
+    _G.EggESP.AutoFarmState = "Mount not confirmed; check selected pet"
+    return false
+end
+
+function _G.EggESP.DestroyAutoFarmReturnPad()
+    local pad = _G.EggESP.AutoFarmReturnPad
+    _G.EggESP.AutoFarmReturnPad = nil
+    if pad then
+        pcall(function()
+            pad:Destroy()
+        end)
+    end
+end
+
+function _G.EggESP.CreateAutoFarmReturnPad(startPosition, plotPosition)
+    _G.EggESP.DestroyAutoFarmReturnPad()
+
+    -- Build the lane from the exact root X/Z at the egg to the exact root X/Z
+    -- used by GetPlotReturnCFrame. Every segment shares this same centerline.
+    local startXZ = Vector3.new(startPosition.X, 0, startPosition.Z)
+    local plotXZ = Vector3.new(plotPosition.X, 0, plotPosition.Z)
+    local route = plotXZ - startXZ
+    local horizontalDistance = route.Magnitude
+    local direction = horizontalDistance > 0.01 and route.Unit or Vector3.new(0, 0, -1)
+    local height = math.max(startPosition.Y, plotPosition.Y) + (_G.EggESP.AutoFarmPadHeight or 35)
+
+    local extension = 24
+    local totalLength = math.max(72, horizontalDistance + extension * 2)
+    local segmentLength = 180
+    local segmentCount = math.max(1, math.ceil(totalLength / segmentLength))
+    local step = totalLength / segmentCount
+    local width = 120
+    local thickness = 8
+    local runway = Instance.new("Model")
+    runway.Name = "DiabloHub_AutoFarm_ReturnRunway"
+
+    local lineStart = Vector3.new(startPosition.X, height - thickness / 2, startPosition.Z) - direction * extension
+    for index = 1, segmentCount do
+        local center = lineStart + direction * ((index - 0.5) * step)
+        local segment = Instance.new("Part")
+        segment.Name = "RunwaySegment_" .. tostring(index)
+        segment.Anchored = true
+        segment.CanCollide = true
+        segment.CanTouch = false
+        segment.CanQuery = false
+        segment.Transparency = 0.3
+        segment.Color = Color3.fromRGB(82, 91, 108)
+        segment.Material = Enum.Material.SmoothPlastic
+        segment.TopSurface = Enum.SurfaceType.Smooth
+        segment.BottomSurface = Enum.SurfaceType.Smooth
+        segment.Size = Vector3.new(width, thickness, step + 2)
+        segment.CFrame = CFrame.lookAt(center, center + direction)
+        segment.Parent = runway
+    end
+
+    runway.Parent = workspace
+    _G.EggESP.AutoFarmReturnPad = runway
+    return height
+end
+function _G.EggESP.TeleportRootToCFrame(targetRootCFrame)
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not character or not root or typeof(targetRootCFrame) ~= "CFrame" then
+        return false
+    end
+
+    -- PivotTo expects the Model pivot, not necessarily the HumanoidRootPart.
+    -- Transform by the live root-to-pivot offset so the ROOT lands exactly on target.
+    local pivotOffset = root.CFrame:ToObjectSpace(character:GetPivot())
+    character:PivotTo(targetRootCFrame * pivotOffset)
+
+    root = character:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end
+    return root ~= nil
+end
+
+function _G.EggESP.TeleportRootToPosition(position, facePosition)
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not character or not root or typeof(position) ~= "Vector3" then
+        return false
+    end
+
+    local lookAt = facePosition and Vector3.new(facePosition.X, position.Y, facePosition.Z) or nil
+    local targetRootCFrame
+    if lookAt and (lookAt - position).Magnitude > 0.05 then
+        targetRootCFrame = CFrame.lookAt(position, lookAt)
+    else
+        targetRootCFrame = CFrame.new(position) * root.CFrame.Rotation
+    end
+
+    return _G.EggESP.TeleportRootToCFrame(targetRootCFrame)
+end
+function _G.EggESP.RestoreAutoFarmWalkSpeed()
+    local player = _G.EggESP.LocalPlayer
+    local character = player and player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local originalSpeed = _G.EggESP.AutoFarmOriginalWalkSpeed
+    local originalAutoRotate = _G.EggESP.AutoFarmOriginalAutoRotate
+
+    _G.EggESP.AutoFarmMovementOverride = false
+    if humanoid then
+        pcall(function()
+            if originalSpeed then
+                humanoid.WalkSpeed = originalSpeed
+            end
+            if originalAutoRotate ~= nil then
+                humanoid.AutoRotate = originalAutoRotate
+            end
+            humanoid:Move(Vector3.zero, false)
+        end)
+    end
+    _G.EggESP.AutoFarmOriginalWalkSpeed = nil
+    _G.EggESP.AutoFarmOriginalAutoRotate = nil
+end
+
+function _G.EggESP.RunElevatedReturnToPlot()
+    local player = _G.EggESP.LocalPlayer
+    local character = player and player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local plotCFrame = _G.EggESP.GetPlotReturnCFrame()
+
+    if not character or not root or not humanoid or not plotCFrame then
+        _G.EggESP.SetAutoFarmRunningState(false)
+        _G.EggESP.RestoreAutoFarmWalkSpeed()
+        _G.EggESP.SetAutoFarmNoclip(false)
+        _G.EggESP.DestroyAutoFarmReturnPad()
+        _G.EggESP.AutoFarmState = "Return route unavailable"
+        return false
+    end
+
+    local speed = math.clamp(tonumber(_G.EggESP.AutoFarmWalkSpeed) or 350, 50, 1000)
+    local startPosition = root.Position
+    local destination = plotCFrame.Position
+    local startXZ = Vector3.new(startPosition.X, 0, startPosition.Z)
+    local destinationXZ = Vector3.new(destination.X, 0, destination.Z)
+    local initialDistance = (destinationXZ - startXZ).Magnitude
+    local routeDirection = initialDistance > 0.01 and (destinationXZ - startXZ).Unit or Vector3.new(0, 0, -1)
+
+    -- A continuous solid runway follows the straight egg-to-plot centerline.
+    -- The player is moved to its start immediately; no tween or noclip is used.
+    local routeHeight = _G.EggESP.CreateAutoFarmReturnPad(startPosition, destination)
+    local rootClearance = math.max(3.5, root.Size.Y * 0.5 + humanoid.HipHeight + 0.25)
+    local runRootY = routeHeight + rootClearance
+    local routeStart = Vector3.new(startPosition.X, runRootY, startPosition.Z)
+    local routeEnd = Vector3.new(destination.X, runRootY, destination.Z)
+
+    _G.EggESP.AutoFarmOriginalWalkSpeed = humanoid.WalkSpeed
+    _G.EggESP.AutoFarmOriginalAutoRotate = humanoid.AutoRotate
+    _G.EggESP.AutoFarmMovementOverride = true
+    _G.EggESP.SetAutoFarmRunningState(true)
+    _G.EggESP.SetAutoFarmNoclip(false)
+
+    if not _G.EggESP.TeleportRootToPosition(routeStart, routeEnd) then
+        _G.EggESP.SetAutoFarmRunningState(false)
+        _G.EggESP.RestoreAutoFarmWalkSpeed()
+        _G.EggESP.DestroyAutoFarmReturnPad()
+        return false
+    end
+
+    local movementFailed = false
+    local ok = pcall(function()
+        while _G.EggESP.Running and _G.EggESP.AutoFarmEnabled and #_G.EggESP.AutoFarmEggs > 0 do
+            character = player.Character
+            root = character and character:FindFirstChild("HumanoidRootPart")
+            humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            plotCFrame = _G.EggESP.GetPlotReturnCFrame()
+            if not character or not root or not humanoid or not plotCFrame then
+                movementFailed = true
+                break
+            end
+
+            destination = plotCFrame.Position
+            local currentXZ = Vector3.new(root.Position.X, 0, root.Position.Z)
+            destinationXZ = Vector3.new(destination.X, 0, destination.Z)
+            local toPlot = destinationXZ - currentXZ
+            local remaining = toPlot.Magnitude
+
+            -- No percentage shortcut and no final teleport: walk the complete
+            -- horizontal route until positioned over the plot itself.
+            local walkedDistance = initialDistance - remaining
+            if remaining <= 2 then
+                break
+            end
+
+            routeDirection = remaining > 0.01 and toPlot.Unit or routeDirection
+            humanoid.WalkSpeed = speed
+            humanoid.AutoRotate = false
+
+            -- Override WASD each frame with a world-space direction. This is
+            -- ordinary Humanoid running movement, not TweenService/CFrame travel.
+            pcall(function()
+                humanoid:Move(routeDirection, false)
+                humanoid:ChangeState(Enum.HumanoidStateType.Running)
+            end)
+            local facePosition = Vector3.new(destination.X, root.Position.Y, destination.Z)
+            if (facePosition - root.Position).Magnitude > 0.05 then
+                root.CFrame = CFrame.lookAt(root.Position, facePosition)
+            end
+
+            _G.EggESP.AutoFarmState = string.format("Running to plot • %d%%", math.floor(math.clamp(walkedDistance / math.max(initialDistance, 1) * 100, 0, 100)))
+            _G.EggESP.RunService.Heartbeat:Wait()
+        end
+    end)
+
+    _G.EggESP.SetAutoFarmRunningState(false)
+    _G.EggESP.RestoreAutoFarmWalkSpeed()
+    pcall(function()
+        humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            humanoid:Move(Vector3.zero, false)
+        end
+    end)
+
+    -- The character has walked to the plot's X/Z position. Do not teleport at
+    -- a percentage threshold or at arrival; remove the runway so the character
+    -- can settle onto the actual plot with normal collisions enabled.
+    if ok and not movementFailed and _G.EggESP.Running then
+        _G.EggESP.AutoFarmState = "Reached plot by walking"
+    end
+    _G.EggESP.SetAutoFarmNoclip(false)
+    _G.EggESP.DestroyAutoFarmReturnPad()
+    if not ok or movementFailed then
+        return false
+    end
+    return true
+end
+function _G.EggESP.TeleportToPlot()
+    local targetRootCFrame = _G.EggESP.GetPlotReturnCFrame()
+    if not targetRootCFrame then
+        return false
+    end
+    return _G.EggESP.TeleportRootToCFrame(targetRootCFrame)
+end
+function _G.EggESP.GetEggPrompt(model)
+    if not model or not model.Parent then
+        return nil
+    end
+
+    for _, object in ipairs(model:GetDescendants()) do
+        if object:IsA("ProximityPrompt") and object.Parent then
+            return object
+        end
+    end
+
+    return nil
+end
+
+function _G.EggESP.FireEggPrompt(prompt)
+    if not prompt or not prompt.Parent then
+        return false
+    end
+
+    pcall(function()
+        prompt.HoldDuration = 0
+        prompt.RequiresLineOfSight = false
+        if prompt.MaxActivationDistance < 1000 then
+            prompt.MaxActivationDistance = 1000
+        end
+    end)
+
+    if type(fireproximityprompt) == "function" then
+        local ok = pcall(function()
+            fireproximityprompt(prompt)
+        end)
+        return ok
+    end
+
+    local ok = pcall(function()
+        prompt:InputHoldBegin()
+        prompt:InputHoldEnd()
+    end)
+    return ok
+end
+
+function _G.EggESP.CollectEggWithPrompt(model)
+    if not model or not model.Parent then
+        return true
+    end
+
+    local deadline = os.clock() + _G.EggESP.AutoFarmCollectTimeout
+
+    while _G.EggESP.AutoFarmEnabled and model.Parent and os.clock() < deadline do
+        local prompt = _G.EggESP.GetEggPrompt(model)
+
+        if prompt then
+            _G.EggESP.FireEggPrompt(prompt)
+        end
+
+        if not model.Parent then
+            return true
+        end
+
+        task.wait(_G.EggESP.AutoFarmPromptInterval)
+    end
+
+    return not model.Parent
+end
+
+function _G.EggESP.WaitForBreakTimerThenTeleport()
+    local player = _G.EggESP.LocalPlayer
+    local startClock = os.clock()
+    local timerDataDeadline = startClock + 5
+    local emptyBasketDeadline = startClock + 3
+
+    _G.EggESP.AutoFarmState = "Waiting for break timer threshold"
+
+    while _G.EggESP.Running and _G.EggESP.AutoFarmEnabled do
+        local basket = player and player:FindFirstChild("Basket")
+        local basketCount = basket and #basket:GetChildren() or 0
+        local now = workspace:GetServerTimeNow()
+        local soonestRemaining = nil
+        _G.EggESP.AutoFarmBreakTarget = nil
+
+        if basketCount > 0 then
+            for _, item in ipairs(basket:GetChildren()) do
+                local breakAt = tonumber(item:GetAttribute("BreakAt"))
+                if breakAt and breakAt == breakAt and math.abs(breakAt) < math.huge then
+                    -- BreakSeconds represents the egg's configured timer length.
+                    -- Short timers (20s or less) return at 1s; longer timers at 10s.
+                    local totalBreakSeconds = tonumber(item:GetAttribute("BreakSeconds"))
+                    local targetRemaining = (totalBreakSeconds and totalBreakSeconds <= 20) and 1 or 10
+                    -- Match the game's BreakTimer: a paused timer is measured
+                    -- against BreakPausedAt until the game resumes it.
+                    local pausedAt = tonumber(item:GetAttribute("BreakPausedAt"))
+                    local timerNow = pausedAt or now
+                    local remaining = breakAt - timerNow
+                    if remaining == remaining and math.abs(remaining) < math.huge then
+                        if soonestRemaining == nil or remaining < soonestRemaining then
+                            soonestRemaining = remaining
+                        end
+                        if _G.EggESP.AutoFarmBreakTarget == nil or targetRemaining < _G.EggESP.AutoFarmBreakTarget then
+                            _G.EggESP.AutoFarmBreakTarget = targetRemaining
+                        end
+                    end
+                end
+            end
+
+            if soonestRemaining ~= nil then
+                local targetRemaining = _G.EggESP.AutoFarmBreakTarget or 10
+                if soonestRemaining <= targetRemaining then
+                    _G.EggESP.AutoFarmState = string.format("Break timer reached %.0fs • returning to plot", targetRemaining)
+                    local returned = _G.EggESP.TeleportToPlot()
+                    if returned then
+                        _G.EggESP.AutoFarmState = string.format("Returned to plot at %.0fs break timer", targetRemaining)
+                    else
+                        _G.EggESP.AutoFarmState = "Break timer ready • plot teleport failed"
+                    end
+                    return returned
+                end
+
+                _G.EggESP.AutoFarmState = string.format(
+                    "Waiting for break timer • %.1fs left (target %.0fs)",
+                    math.max(soonestRemaining, 0),
+                    _G.EggESP.AutoFarmBreakTarget or 10
+                )
+            else
+                if os.clock() >= timerDataDeadline then
+                    _G.EggESP.AutoFarmState = "Break timer unavailable • returning to plot"
+                    return _G.EggESP.TeleportToPlot()
+                end
+                _G.EggESP.AutoFarmState = "Waiting for break timer data"
+            end
+        else
+            -- Give the server a short window to replicate the basket item and
+            -- its BreakAt attribute after prompt collection.
+            if os.clock() >= emptyBasketDeadline then
+                _G.EggESP.AutoFarmState = "No carried egg timer • returning to plot"
+                return _G.EggESP.TeleportToPlot()
+            end
+            _G.EggESP.AutoFarmState = "Waiting for carried egg"
+        end
+
+        task.wait(0.1)
+    end
+
+    return false
+end
+
+function _G.EggESP.RunAutoFarmCycle()
+    if not _G.EggESP.AutoFarmEnabled or _G.EggESP.AutoFarmBusy then
+        return false
+    end
+
+    -- When nothing from the dropdown is currently spawned, stay in normal collision
+    -- mode and do not mount/teleport until a selected egg actually exists.
+    if #_G.EggESP.AutoFarmEggs == 0 then
+        _G.EggESP.AutoFarmState = "No eggs selected"
+        _G.EggESP.SetAutoFarmNoclip(false)
+        _G.EggESP.DestroyAutoFarmReturnPad()
+        return false
+    end
+
+    local target = _G.EggESP.FindAutoFarmEgg()
+    if not target or not target.Parent then
+        _G.EggESP.AutoFarmState = "Waiting for selected eggs"
+        _G.EggESP.SetAutoFarmNoclip(false)
+        _G.EggESP.DestroyAutoFarmReturnPad()
+        return false
+    end
+
+    if not _G.EggESP.EnsureAutoFarmMounted() then
+        return false
+    end
+    if not _G.EggESP.AutoFarmEnabled or not target.Parent or not _G.EggESP.AutoFarmLookup[target.Name] then
+        _G.EggESP.AutoFarmState = "Waiting for selected eggs"
+        return false
+    end
+
+    _G.EggESP.AutoFarmBusy = true
+    _G.EggESP.AutoFarmLastTarget = target.Name
+    _G.EggESP.AutoFarmState = "Going to " .. target.Name
+
+    if not _G.EggESP.TeleportToEgg(target) then
+        _G.EggESP.AutoFarmBusy = false
+        _G.EggESP.AutoFarmState = "Teleport failed"
+        return false
+    end
+
+    _G.EggESP.AutoFarmState = "Prompt collecting " .. target.Name
+    local collected = _G.EggESP.CollectEggWithPrompt(target)
+
+    if _G.EggESP.AutoFarmEnabled then
+        if collected then
+            if _G.EggESP.AutoFarmReturnMethod == "Wait" then
+                _G.EggESP.WaitForBreakTimerThenTeleport()
+            else
+                _G.EggESP.RunElevatedReturnToPlot()
+            end
+        else
+            _G.EggESP.AutoFarmState = "Prompt timeout • walking back"
+            _G.EggESP.RunElevatedReturnToPlot()
+        end
+
+        if collected then
+            _G.EggESP.AutoFarmCount = _G.EggESP.AutoFarmCount + 1
+            _G.EggESP.AutoFarmState = "Collected " .. target.Name
+        end
+    end
+
+    _G.EggESP.AutoFarmBusy = false
+    return collected
+end
+function _G.EggESP.GetLiveModels()
+
+    local models = {}
+
+    for model in pairs(_G.EggESP.ESPs) do
+
+        if model.Parent and _G.EggESP.IsRenderedEgg(model) then
+
+            table.insert(models, model)
+
+        end
+
+    end
+
+    return models
+
+end
+
+function _G.EggESP.GetLiveText(rootPosition)
+
+    local rows = {}
+
+    local models = _G.EggESP.GetLiveModels()
+
+    table.sort(models, function(a, b)
+
+        local da = _G.EggESP.ESPs[a]
+
+        local db = _G.EggESP.ESPs[b]
+
+        local distA = da and da.Part and rootPosition and (rootPosition - da.Part.Position).Magnitude or math.huge
+
+        local distB = db and db.Part and rootPosition and (rootPosition - db.Part.Position).Magnitude or math.huge
+
+        if distA == distB then
+
+            return a.Name < b.Name
+
+        end
+
+        return distA < distB
+
+    end)
+
+    if #models == 0 then
+
+        return "No rendered eggs currently."
+
+    end
+
+    for _, model in ipairs(models) do
+
+        local data = _G.EggESP.ESPs[model]
+
+        local rarity = _G.EggESP.GetRarity(model.Name)
+
+        local distance = data and data.Part and rootPosition and math.floor((rootPosition - data.Part.Position).Magnitude) or 0
+
+        table.insert(rows, string.format("%s  •  %s  •  %d studs", model.Name, rarity, distance))
+
+    end
+
+    return table.concat(rows, "\n")
+
+end
+
+local Airflow = loadstring(game:HttpGet("https://raw.githubusercontent.com/Methions/Airflow/refs/heads/main/Uploaded"))()
+local Window = Airflow:CreateWindow({
+    Name = "Diablo Hub",
+    LoadingSubtitle = "Egg Farm",
+    Icon = "rbxthumb://type=Asset&id=108858394161442&w=150&h=150",
+    ToggleUIKeybind = "RightControl",
+    Size = UDim2.fromOffset(640, 480),
+    MinSize = Vector2.new(480, 360),
+    MaxSize = Vector2.new(1000, 700),
+    MaxNotifications = 4,
+    KeepOnScreen = true,
+    OpenButton = { Title = "Diablo Hub", Icon = "egg" },
+    Loading = {
+        Enabled = true,
+        Title = "Diablo Hub",
+        Text = "Starting",
+        Steps = { "Preparing interface", "Loading eggs", "Almost there" },
+        Duration = 1.4,
+    },
+    ConfigurationSaving = {
+        Enabled = false,
+        FolderName = "EggScanner",
+        FileName = "default",
+    },
+    Home = {
+        Name = "Home",
+        Desc = "Egg scanner",
+        Welcome = "Hello, ",
+        Greeting = "Diablo Hub is ready.",
+        SectionName = "System info",
+        Stats = { "FPS", "Ping", "Executor", "Game", "Region", "Time", "Players", "Uptime" },
+        TimeFormat = "%H:%M",
+        Pages = {
+            {
+                Name = "Status",
+                Icon = "activity",
+                Content = "Egg Farm provides live egg ESP and automatic collection for selected egg types.",
+            },
+            {
+                Name = "Auto Farm",
+                Icon = "crosshair",
+                Content = "Select egg types, enable the farm, and it will collect matching eggs and return to your plot.",
+            },
+        },
+    },
+    Parent = _G.EggESP.CoreGui,
+})
+Window:Toggle(false)
+local EggFarmTab = Window:CreateTab({
+    Name = "Egg Farm",
+    Desc = "Egg ESP and auto farm",
+    Icon = "egg",
+    EmptyText = "Nothing here yet",
+    Pages = {
+        {
+            Name = "Explanation",
+            Icon = "info",
+            Content = "Select one or more egg types in Auto Farm Eggs, then enable auto farm. It searches for matching live eggs, moves to the egg, activates its ProximityPrompt, and returns to your plot after collection. Egg ESP can be enabled on this tab to see live eggs and their distance.",
+        },
+    },
+})
+local PetTab = Window:CreateTab({
+    Name = "Pet",
+    Desc = "Pet speed and jump controls",
+    Icon = "paw-print",
+    EmptyText = "Nothing here yet",
+})
+
+local RadarTab = Window:CreateTab({
+    Name = "Radar",
+    Desc = "Infinite selected-egg radar",
+    Icon = "radar",
+    EmptyText = "Nothing here yet",
+})
+
+local SettingsTab = Window:CreateTab({
+    Name = "Settings",
+    Desc = "Auto farm return movement controls",
+    Icon = "settings",
+    EmptyText = "Nothing here yet",
+})
+
+EggFarmTab:CreateToggle({
+    Name = "Egg ESP",
+    Desc = "Esp's All the egg",
+    CurrentValue = false,
+    Callback = function(value)
+        _G.EggESP.ESPEnabled = value
+        for _, data in pairs(_G.EggESP.ESPs) do
+            if data.Billboard then
+                data.Billboard.Enabled = value
+            end
+        end
+        if value then
+            _G.EggESP.ScanOnce()
+        end
+    end,
+})
+
+local AutoFarmDropdown = EggFarmTab:CreateDropdown({
+    Name = "Auto Farm Eggs",
+    Desc = "Select multiple egg types for the auto farm",
+    Options = _G.EggESP.EggNames,
+    CurrentOption = {"None"},
+    MultipleOptions = true,
+    Callback = function(option)
+        local selected = option
+        if type(option) == "string" then
+            selected = {option}
+        end
+        _G.EggESP.SetAutoFarmSelection(selected)
+    end,
+})
+
+EggFarmTab:CreateToggle({
+    Name = "Enable auto farm",
+    Desc = "GET THEM EGGGGSSSSSSSSSSS",
+    CurrentValue = false,
+    Callback = function(value)
+        _G.EggESP.AutoFarmEnabled = value
+
+        if value then
+            _G.EggESP.AutoFarmMountReady = false
+            if #_G.EggESP.AutoFarmEggs == 0 then
+                _G.EggESP.AutoFarmState = "No eggs selected"
+            else
+                _G.EggESP.AutoFarmState = "Equipping mount"
+            end
+        else
+            -- If auto farm is disabled mid-return, land at the plot before
+            -- restoring collision or removing the temporary runway.
+            if _G.EggESP.AutoFarmMovementOverride then
+                pcall(_G.EggESP.TeleportToPlot)
+            end
+            _G.EggESP.AutoFarmBusy = false
+            _G.EggESP.AutoFarmMountReady = false
+            _G.EggESP.SetAutoFarmRunningState(false)
+            _G.EggESP.RestoreAutoFarmWalkSpeed()
+            _G.EggESP.DestroyAutoFarmReturnPad()
+            _G.EggESP.SetAutoFarmNoclip(false)
+            _G.EggESP.AutoFarmState = "Disabled"
+        end
+    end,
+})
+
+local mountOptions = {"Auto (best available)"}
+for _, mountTool in ipairs(_G.EggESP.GetAutoFarmMountTools()) do
+    if not table.find(mountOptions, mountTool.Name) then
+        table.insert(mountOptions, mountTool.Name)
+    end
+end
+
+SettingsTab:CreateDropdown({
+    Name = "Mount pet",
+    Desc = "Choose a Pet-tagged tool to equip and ride; Auto picks the pet with the highest listed income",
+    Options = mountOptions,
+    CurrentOption = "Auto (best available)",
+    MultipleOptions = false,
+    Callback = function(option)
+        if type(option) == "table" then
+            option = option[1]
+        end
+        if type(option) == "string" and option ~= "" then
+            _G.EggESP.AutoFarmMountSelection = option == "Auto (best available)" and "Auto" or option
+            _G.EggESP.AutoFarmMountReady = false
+        end
+    end,
+})
+
+SettingsTab:CreateDropdown({
+    Name = "Return Method",
+    Desc = "Walk uses the existing elevated running route. Wait returns at 1 second for eggs with a 20-second-or-shorter BreakSeconds timer, or 10 seconds for longer timers, then teleports to your plot.",
+    Options = {"Wait", "Walk"},
+    CurrentOption = "Wait",
+    MultipleOptions = false,
+    Callback = function(option)
+        if type(option) == "table" then
+            option = option[1]
+        end
+        if option == "Wait" or option == "Walk" then
+            _G.EggESP.AutoFarmReturnMethod = option
+        end
+    end,
+})
+
+SettingsTab:CreateSlider({
+    Name = "Return walking speed",
+    Desc = "Speed along a root-aligned straight runway; default is 350 studs/sec",
+    Range = {50, 1000},
+    Increment = 25,
+    CurrentValue = 350,
+    Callback = function(value)
+        _G.EggESP.AutoFarmWalkSpeed = math.clamp(math.floor((tonumber(value) or 350) / 25 + 0.5) * 25, 50, 1000)
+    end,
+})
+
+local function RadarGetColor()
+    local assets = _G.EggESP.ReplicatedStorage:FindFirstChild("Assets")
+    local radars = assets and assets:FindFirstChild("Radars")
+    local infinite = radars and radars:FindFirstChild("Infinite Radar")
+    local handle = infinite and infinite:FindFirstChild("Handle")
+    if handle and handle:IsA("BasePart") then
+        return handle.Color
+    end
+    return Color3.fromRGB(255, 255, 255)
+end
+
+local function RadarDarken(color, amount)
+    return Color3.new(color.R * amount, color.G * amount, color.B * amount)
+end
+
+local function RadarTint(instance, color)
+    if not instance then
+        return
+    end
+    for _, object in instance:GetDescendants() do
+        if object:IsA("UIStroke") then
+            object.Color = color
+        end
+    end
+end
+
+local function RadarPaintTrend(label, distance)
+    if not label then
+        return
+    end
+
+    if not distance then
+        label.TextColor3 = Color3.fromRGB(255, 220, 60)
+        local stroke = label:FindFirstChildOfClass("UIStroke")
+        if stroke then
+            stroke.Color = Color3.fromRGB(20, 90, 35)
+        end
+        _G.EggESP.RadarTrend = nil
+        return
+    end
+
+    local now = os.clock()
+    local previous = _G.EggESP.RadarTrend
+    if not previous then
+        _G.EggESP.RadarTrend = {Distance = distance, Time = now}
+        label.TextColor3 = Color3.fromRGB(255, 220, 60)
+        local stroke = label:FindFirstChildOfClass("UIStroke")
+        if stroke then
+            stroke.Color = Color3.fromRGB(20, 90, 35)
+        end
+        return
+    end
+
+    if now - previous.Time < 0.25 then
+        return
+    end
+
+    local change = distance - previous.Distance
+    previous.Distance = distance
+    previous.Time = now
+
+    local textColor
+    local strokeColor
+    if change < -0.75 then
+        textColor = Color3.fromRGB(85, 235, 105)
+        strokeColor = Color3.fromRGB(20, 90, 35)
+    elseif change > 0.75 then
+        textColor = Color3.fromRGB(255, 85, 85)
+        strokeColor = Color3.fromRGB(110, 20, 20)
+    else
+        textColor = Color3.fromRGB(255, 220, 60)
+        strokeColor = Color3.fromRGB(20, 90, 35)
+    end
+
+    label.TextColor3 = textColor
+    local stroke = label:FindFirstChildOfClass("UIStroke")
+    if stroke then
+        stroke.Color = strokeColor
+    end
+end
+
+local function RadarGetHandle()
+    local character = _G.EggESP.LocalPlayer.Character
+    if not character then
+        return nil
+    end
+
+    local tool = character:FindFirstChild("Infinite Radar")
+    if tool and tool:IsA("Tool") then
+        local handle = tool:FindFirstChild("Handle")
+        if handle and handle:IsA("BasePart") then
+            return handle
+        end
+    end
+
+    local head = character:FindFirstChild("Head")
+    if head and head:IsA("BasePart") then
+        return head
+    end
+
+    return character:FindFirstChild("HumanoidRootPart")
+end
+
+local function RadarMakeArrow(color)
+    local assets = _G.EggESP.ReplicatedStorage:FindFirstChild("Assets")
+    local source = assets and assets:FindFirstChild("Arrow")
+    if not source then
+        return nil
+    end
+
+    local arrow = source:Clone()
+    for _, object in arrow:GetDescendants() do
+        if object:IsA("BasePart") then
+            object.Color = color
+            object.Anchored = true
+            object.CanCollide = false
+            object.CanQuery = false
+            object.CanTouch = false
+        elseif object:IsA("Highlight") then
+            object.FillColor = color
+            object.OutlineColor = RadarDarken(color, 0.45)
+        end
+    end
+
+    local folder = workspace:FindFirstChild("RadarArrows")
+    if not folder then
+        folder = Instance.new("Folder")
+        folder.Name = "RadarArrows"
+        folder.Parent = workspace
+    end
+
+    arrow.Parent = folder
+    return arrow
+end
+
+local function RadarAimArrow(arrow, playerPosition, targetPosition, arrowIndex, clock)
+    if not arrow then
+        return
+    end
+
+    if playerPosition and targetPosition then
+        local timeValue = clock * 3 + arrowIndex
+        local bob = math.sin(timeValue) * 0.25
+        local height = 5 + (arrowIndex - 1) * 1.2 + bob
+        local arrowPosition = playerPosition + Vector3.new(0, height, 0)
+        local flatTarget = Vector3.new(targetPosition.X, arrowPosition.Y, targetPosition.Z)
+
+        if (flatTarget - arrowPosition).Magnitude < 0.5 then
+            arrow:PivotTo(CFrame.new(arrowPosition))
+            return
+        end
+
+        local yDelta = (targetPosition - arrowPosition).Y
+        local horizontalMagnitude = (flatTarget - arrowPosition).Magnitude
+        local angle = math.atan2(yDelta, horizontalMagnitude)
+        local clampedAngle = math.clamp(angle, -0.4363323129985824, 0.4363323129985824)
+        arrow:PivotTo(CFrame.lookAt(arrowPosition, flatTarget) * CFrame.Angles(clampedAngle, 0, 0))
+        return
+    end
+
+    arrow:PivotTo(CFrame.new(0, -1000, 0))
+end
+
+_G.EggESP.RadarFindTarget = function()
+    local wanted = _G.EggESP.RadarEgg
+    if type(wanted) ~= "string" or wanted == "None" then
+        return nil
+    end
+
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then
+        return nil
+    end
+
+    local nearest = nil
+    local nearestDistance = math.huge
+    local rendered = _G.EggESP.RenderedEggs
+    if not rendered then
+        return nil
+    end
+
+    for _, model in rendered:GetChildren() do
+        if model:IsA("Model") and model.Parent and model.Name == wanted then
+            local hasPart = model:FindFirstChildWhichIsA("BasePart", true)
+            if hasPart then
+                local position = model:GetPivot().Position
+                local distance = (position - root.Position).Magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearest = model
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+_G.EggESP.RadarClearVisuals = function()
+    if _G.EggESP.RadarOverhead then
+        pcall(function()
+            _G.EggESP.RadarOverhead:Destroy()
+        end)
+        _G.EggESP.RadarOverhead = nil
+    end
+
+    if _G.EggESP.RadarArrow then
+        pcall(function()
+            _G.EggESP.RadarArrow:Destroy()
+        end)
+        _G.EggESP.RadarArrow = nil
+    end
+
+    _G.EggESP.RadarTarget = nil
+    _G.EggESP.RadarLastDistance = nil
+    _G.EggESP.RadarTargetCheck = 0
+    _G.EggESP.RadarTrend = nil
+end
+
+_G.EggESP.RadarUpdate = function()
+    if not _G.EggESP.Running or not _G.EggESP.RadarEnabled then
+        _G.EggESP.RadarClearVisuals()
+        return
+    end
+
+    local character = _G.EggESP.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    local handle = RadarGetHandle()
+    if not root or not handle then
+        _G.EggESP.RadarClearVisuals()
+        return
+    end
+
+    local assets = _G.EggESP.ReplicatedStorage:FindFirstChild("Assets")
+    local billboards = assets and assets:FindFirstChild("Billboards")
+    local overheadSource = billboards and billboards:FindFirstChild("RadarOverhead")
+    local color = RadarGetColor()
+
+    if not _G.EggESP.RadarOverhead and overheadSource then
+        local overhead = overheadSource:Clone()
+        RadarTint(overhead, RadarDarken(color, 0.2))
+        overhead.Parent = _G.EggESP.PlayerGui
+        _G.EggESP.RadarOverhead = overhead
+    end
+
+    if not _G.EggESP.RadarArrow then
+        _G.EggESP.RadarArrow = RadarMakeArrow(color)
+    end
+
+    local now = os.clock()
+    local target = _G.EggESP.RadarTarget
+    if now - _G.EggESP.RadarTargetCheck >= 0.25 or not target or not target.Parent or target.Name ~= _G.EggESP.RadarEgg then
+        target = _G.EggESP.RadarFindTarget()
+        _G.EggESP.RadarTarget = target
+        _G.EggESP.RadarTargetCheck = now
+    end
+
+    if not target or not target.Parent then
+        if _G.EggESP.RadarOverhead then
+            _G.EggESP.RadarOverhead.Adornee = handle
+            _G.EggESP.RadarOverhead.Enabled = true
+            local distanceLabel = _G.EggESP.RadarOverhead:FindFirstChild("Distance")
+            if distanceLabel then
+                distanceLabel.Text = "?"
+                RadarPaintTrend(distanceLabel, nil)
+            end
+        end
+        if _G.EggESP.RadarArrow then
+            _G.EggESP.RadarArrow:PivotTo(CFrame.new(0, -1000, 0))
+        end
+        return
+    end
+
+    local targetPosition = target:GetPivot().Position
+    local distance = math.round((root.Position - targetPosition).Magnitude)
+    _G.EggESP.RadarLastDistance = distance
+
+    if _G.EggESP.RadarOverhead then
+        _G.EggESP.RadarOverhead.Adornee = handle
+        _G.EggESP.RadarOverhead.Enabled = true
+        local distanceLabel = _G.EggESP.RadarOverhead:FindFirstChild("Distance")
+        if distanceLabel then
+            distanceLabel.Text = tostring(distance) .. "m"
+            RadarPaintTrend(distanceLabel, distance)
+        end
+    end
+
+    local lookVector = root.CFrame.LookVector
+    local horizontalLook = Vector3.new(lookVector.X, 0, lookVector.Z)
+    local forwardOffset = Vector3.new(0, 0, 0)
+    if horizontalLook.Magnitude > 0.01 then
+        forwardOffset = horizontalLook.Unit * 4
+    end
+
+    RadarAimArrow(
+        _G.EggESP.RadarArrow,
+        handle.Position + forwardOffset,
+        targetPosition,
+        0,
+        now
+    )
+
+    if _G.EggESP.RadarArrow then
+        local distanceLabel = _G.EggESP.RadarOverhead and _G.EggESP.RadarOverhead:FindFirstChild("Distance")
+        if distanceLabel then
+            for _, object in _G.EggESP.RadarArrow:GetDescendants() do
+                if object:IsA("BasePart") then
+                    object.Color = distanceLabel.TextColor3
+                elseif object:IsA("Highlight") then
+                    object.FillColor = distanceLabel.TextColor3
+                    object.OutlineColor = RadarDarken(distanceLabel.TextColor3, 0.45)
+                end
+            end
+        end
+    end
+end
+
+_G.EggESP.RadarThread = _G.EggESP.RunService.RenderStepped:Connect(function()
+    if _G.EggESP.Running then
+        _G.EggESP.RadarUpdate()
+    end
+end)
+
+RadarTab:CreateDropdown({
+    Name = "Eggs",
+    Desc = "Choose exactly one egg for the radar to track",
+    Options = _G.EggESP.EggNames,
+    CurrentOption = "None",
+    MultipleOptions = false,
+    Callback = function(option)
+        if type(option) == "table" then
+            option = option[1]
+        end
+
+        if type(option) ~= "string" or not _G.EggESP.EggData[option] then
+            option = "None"
+        end
+
+        _G.EggESP.RadarEgg = option
+    end,
+})
+
+RadarTab:CreateToggle({
+    Name = "Infinite Radar",
+    Desc = "revere the radar its still spelled radar INSTANT THAT MIND BLOWING get a job bro",
+    CurrentValue = false,
+    Callback = function(value)
+        _G.EggESP.RadarEnabled = value
+        if not value then
+            _G.EggESP.RadarClearVisuals()
+        end
+    end,
+})
+
+_G.EggESP.RadarStatusParagraph = RadarTab:CreateParagraph({
+    Title = "Radar",
+    Content = "Select one egg, then enable Infinite Radar.",
+})
+
+local PetControls = PetTab
+
+PetControls:CreateSlider({
+    Name = "pet speed",
+    Desc = "Set the riding speed",
+    Range = {1, 250},
+    Increment = 1,
+    CurrentValue = 16,
+    Callback = function(value)
+        value = tonumber(value) or 16
+        _G.EggESP.PetSpeed = math.clamp(value, 1, 250)
+    end,
+})
+
+PetControls:CreateSlider({
+    Name = "Jump Height",
+    Desc = "Set the jump height while pet mode is enabled",
+    Range = {1, 50},
+    Increment = 1,
+    CurrentValue = 7.2,
+    Callback = function(value)
+        _G.EggESP.PetJumpHeight = math.clamp(tonumber(value) or 7.2, 1, 50)
+    end,
+})
+
+PetControls:CreateToggle({
+    Name = "Instant Acceleration / Instant Stop",
+    Desc = "SPEED O SOUND SONIC",
+    CurrentValue = false,
+    Callback = function(value)
+        _G.EggESP.PetInstantMovement = value
+
+        if not value then
+            local character = _G.EggESP.LocalPlayer.Character
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local velocity = root.AssemblyLinearVelocity
+                root.AssemblyLinearVelocity = Vector3.new(0, velocity.Y, 0)
+            end
+        end
+    end,
+})
+
+PetControls:CreateToggle({
+    Name = "Enable Pet",
+    Desc = "ENABLEEEEEE",
+    CurrentValue = false,
+    Callback = function(value)
+        _G.EggESP.PetEnabled = value
+
+        local character = _G.EggESP.LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local riding = _G.EggESP.LocalPlayer:GetAttribute("IsRiding") == true
+            or _G.EggESP.LocalPlayer:GetAttribute("IsPassenger") == true
+
+        if value then
+            if humanoid and riding then
+                _G.EggESP.PetRestoreCharacter = character
+                _G.EggESP.PetRestoreWalkSpeed = humanoid.WalkSpeed
+                _G.EggESP.PetRestoreUseJumpPower = humanoid.UseJumpPower
+                _G.EggESP.PetRestoreJumpPower = humanoid.JumpPower
+                _G.EggESP.PetRestoreJumpHeight = humanoid.JumpHeight
+            end
+        else
+            if _G.EggESP.PetRestoreCharacter then
+                local restoreHumanoid = _G.EggESP.PetRestoreCharacter:FindFirstChildOfClass("Humanoid")
+                if restoreHumanoid then
+                    if _G.EggESP.PetRestoreWalkSpeed then
+                        restoreHumanoid.WalkSpeed = _G.EggESP.PetRestoreWalkSpeed
+                    end
+                    if _G.EggESP.PetRestoreUseJumpPower ~= nil then
+                        restoreHumanoid.UseJumpPower = _G.EggESP.PetRestoreUseJumpPower
+                    end
+                    if _G.EggESP.PetRestoreJumpPower then
+                        restoreHumanoid.JumpPower = _G.EggESP.PetRestoreJumpPower
+                    end
+                    if _G.EggESP.PetRestoreJumpHeight then
+                        restoreHumanoid.JumpHeight = _G.EggESP.PetRestoreJumpHeight
+                    end
+                end
+            end
+            _G.EggESP.PetRestoreCharacter = nil
+            _G.EggESP.PetRestoreWalkSpeed = nil
+            _G.EggESP.PetRestoreUseJumpPower = nil
+            _G.EggESP.PetRestoreJumpPower = nil
+            _G.EggESP.PetRestoreJumpHeight = nil
+        end
+    end,
+})
+
+local LiveTab = Window:CreateTab({
+
+    Name = "Live Eggs",
+
+    Desc = "Currently rendered eggs",
+
+    Icon = "list",
+
+    EmptyText = "No rendered eggs",
+
+})
+
+_G.EggESP.FarmStatusParagraph = EggFarmTab:CreateParagraph({
+    Title = "Auto Farm Status",
+    Content = "Disabled",
+})
+
+EggFarmTab:CreateButton({
+    Name = "TP Plot",
+    Desc = "Teleport to your owned plot",
+    Callback = function()
+        _G.EggESP.TeleportToPlot()
+    end,
+})
+
+EggFarmTab:CreateButton({
+    Name = "Rescan Eggs",
+    Desc = "Scan RenderedEggs once",
+    Callback = function()
+        _G.EggESP.ScanOnce()
+    end,
+})
+
+_G.EggESP.LiveParagraph = LiveTab:CreateParagraph({
+    Title = "Live Eggs",
+    Content = "Scanning...",
+})
+LiveTab:CreateButton({
+    Name = "Refresh List",
+    Desc = "Rescan the rendered egg folder",
+    Callback = function()
+        _G.EggESP.ScanOnce()
+    end,
+})
+local function setParagraph(title, content)
+    local paragraph = _G.EggESP.LiveParagraph
+    if not paragraph then
+        return
+    end
+    for _, method in ipairs({"Set", "Update", "Refresh"}) do
+        local fn = paragraph[method]
+        if type(fn) == "function" then
+            local ok = pcall(function()
+                if method == "Set" then
+                    paragraph:Set({Title = title, Content = content})
+                else
+                    paragraph[method](paragraph, {Title = title, Content = content})
+                end
+            end)
+            if ok then
+                return
+            end
+            local ok2 = pcall(function()
+                if method == "Set" then
+                    paragraph:Set(content)
+                else
+                    paragraph[method](paragraph, content)
+                end
+            end)
+            if ok2 then
+            return
+            end
+        end
+    end
+end
+
+_G.EggESP.UpdateFarmStatus = function()
+    local paragraph = _G.EggESP.FarmStatusParagraph
+    if not paragraph then
+        return
+    end
+
+    local selected = #_G.EggESP.AutoFarmEggs > 0 and table.concat(_G.EggESP.AutoFarmEggs, ", ") or "None"
+    local content = string.format(
+        "State: %s\nTarget: %s\nSelected: %s\nCollected: %d",
+        _G.EggESP.AutoFarmState,
+        _G.EggESP.AutoFarmLastTarget,
+        selected,
+        _G.EggESP.AutoFarmCount
+    )
+
+    if content == _G.EggESP.LastFarmStatus then
+        return
+    end
+    _G.EggESP.LastFarmStatus = content
+    for _, method in ipairs({"Set", "Update", "Refresh"}) do
+        local fn = paragraph[method]
+        if type(fn) == "function" then
+            local ok = pcall(function()
+                if method == "Set" then
+                    paragraph:Set({Title = "Auto Farm Status", Content = content})
+                else
+                    paragraph[method](paragraph, {Title = "Auto Farm Status", Content = content})
+                end
+            end)
+            if ok then
+                return
+            end
+            local ok2 = pcall(function()
+                if method == "Set" then
+                    paragraph:Set(content)
+                else
+                    paragraph[method](paragraph, content)
+                end
+            end)
+            if ok2 then
+                return
+            end
+        end
+    end
+end
+_G.EggESP.ScanOnce()
+_G.EggESP.Connections.Added = _G.EggESP.RenderedEggs.DescendantAdded:Connect(function(object)
+    if not _G.EggESP.Running then
+        return
+    end
+
+    task.defer(function()
+        if not object.Parent then
+            return
+        end
+
+        local model = object:IsA("Model") and object or object:FindFirstAncestorOfClass("Model")
+        if model and model:IsDescendantOf(_G.EggESP.RenderedEggs) and _G.EggESP.IsRenderedEgg(model) then
+            _G.EggESP.CreateESP(model)
+        end
+    end)
+end)
+
+_G.EggESP.Connections.Removing = _G.EggESP.RenderedEggs.DescendantRemoving:Connect(function(object)
+    if object:IsA("Model") then
+        _G.EggESP.RemoveESP(object)
+    end
+end)
+
+_G.EggESP.ESPScanThread = task.spawn(function()
+    while _G.EggESP.Running do
+        _G.EggESP.ScanOnce()
+        task.wait(0.15)
+    end
+end)
+
+_G.EggESP.UpdateThread = task.spawn(function()
+    while _G.EggESP.Running do
+        task.wait(_G.EggESP.DistanceRate)
+
+        local character = _G.EggESP.LocalPlayer.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        local position = root and root.Position
+        local liveCount = 0
+
+        for model, data in pairs(_G.EggESP.ESPs) do
+            if not model.Parent or not data.Part or not data.Part.Parent then
+                _G.EggESP.RemoveESP(model)
+            else
+                liveCount = liveCount + 1
+                if data.Billboard then
+                    data.Billboard.Enabled = _G.EggESP.ESPEnabled
+                end
+                local distance = position and math.floor((position - data.Part.Position).Magnitude) or 0
+                data.Label.Text = model.Name .. "\n[" .. distance .. " studs]"
+                data.Label.TextColor3 = _G.EggESP.GetColor(model.Name)
+            end
+        end
+
+        local liveText = _G.EggESP.GetLiveText(position)
+        if liveText ~= _G.EggESP.LastLiveText then
+            _G.EggESP.LastLiveText = liveText
+            setParagraph("Live Eggs  •  " .. tostring(liveCount), liveText)
+        end
+    end
+end)
+
+_G.EggESP.AutoFarmThread = task.spawn(function()
+    while _G.EggESP.Running do
+        if _G.EggESP.AutoFarmEnabled then
+            _G.EggESP.RunAutoFarmCycle()
+            task.wait(_G.EggESP.AutoFarmCheckRate)
+        else
+            task.wait(0.25)
+        end
+    end
+end)
+
+_G.EggESP.FarmStatusThread = task.spawn(function()
+    while _G.EggESP.Running do
+        task.wait(0.2)
+        _G.EggESP.UpdateFarmStatus()
+    end
+end)
+
+_G.EggESP.PetPhysicsThread = task.spawn(function()
+    while _G.EggESP.Running do
+        _G.EggESP.RunService.RenderStepped:Wait()
+
+        if _G.EggESP.PetInstantMovement and _G.EggESP.PetEnabled and not _G.EggESP.AutoFarmMovementOverride then
+            local character = _G.EggESP.LocalPlayer.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            local root = character and character:FindFirstChild("HumanoidRootPart")
+            local riding = _G.EggESP.LocalPlayer:GetAttribute("IsRiding") == true
+                or _G.EggESP.LocalPlayer:GetAttribute("IsPassenger") == true
+
+            if humanoid and root and riding then
+                local moveDirection = humanoid.MoveDirection
+                local velocity = root.AssemblyLinearVelocity
+
+                if moveDirection.Magnitude > 0.01 then
+                    local horizontal = moveDirection.Unit * _G.EggESP.PetSpeed
+                    root.AssemblyLinearVelocity = Vector3.new(horizontal.X, velocity.Y, horizontal.Z)
+                else
+                    root.AssemblyLinearVelocity = Vector3.new(0, velocity.Y, 0)
+                end
+            end
+        end
+    end
+end)
+
+_G.EggESP.PetSpeedThread = task.spawn(function()
+    while _G.EggESP.Running do
+        task.wait(0.05)
+
+        local character = _G.EggESP.LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local riding = _G.EggESP.LocalPlayer:GetAttribute("IsRiding") == true
+            or _G.EggESP.LocalPlayer:GetAttribute("IsPassenger") == true
+
+        if _G.EggESP.AutoFarmMovementOverride then
+            if humanoid and humanoid.WalkSpeed ~= _G.EggESP.AutoFarmWalkSpeed then
+                humanoid.WalkSpeed = _G.EggESP.AutoFarmWalkSpeed
+            end
+        elseif _G.EggESP.PetEnabled and humanoid and riding then
+            if _G.EggESP.PetRestoreCharacter ~= character then
+                _G.EggESP.PetRestoreCharacter = character
+                _G.EggESP.PetRestoreWalkSpeed = humanoid.WalkSpeed
+                _G.EggESP.PetRestoreUseJumpPower = humanoid.UseJumpPower
+                _G.EggESP.PetRestoreJumpPower = humanoid.JumpPower
+                _G.EggESP.PetRestoreJumpHeight = humanoid.JumpHeight
+            end
+
+            if humanoid.WalkSpeed ~= _G.EggESP.PetSpeed then
+                humanoid.WalkSpeed = _G.EggESP.PetSpeed
+            end
+
+            if humanoid.UseJumpPower then
+                local jumpPower = math.clamp(50 + (_G.EggESP.PetJumpHeight - 7) * 10, 1, 500)
+                if humanoid.JumpPower ~= jumpPower then
+                    humanoid.JumpPower = jumpPower
+                end
+            else
+                if humanoid.JumpHeight ~= _G.EggESP.PetJumpHeight then
+                    humanoid.JumpHeight = _G.EggESP.PetJumpHeight
+                end
+            end
+        elseif _G.EggESP.PetRestoreCharacter and _G.EggESP.PetRestoreCharacter == character then
+            if humanoid then
+                if _G.EggESP.PetRestoreWalkSpeed then
+                    humanoid.WalkSpeed = _G.EggESP.PetRestoreWalkSpeed
+                end
+                if _G.EggESP.PetRestoreUseJumpPower ~= nil then
+                    humanoid.UseJumpPower = _G.EggESP.PetRestoreUseJumpPower
+                end
+                if _G.EggESP.PetRestoreJumpPower then
+                    humanoid.JumpPower = _G.EggESP.PetRestoreJumpPower
+                end
+                if _G.EggESP.PetRestoreJumpHeight then
+                    humanoid.JumpHeight = _G.EggESP.PetRestoreJumpHeight
+                end
+            end
+            _G.EggESP.PetRestoreCharacter = nil
+            _G.EggESP.PetRestoreWalkSpeed = nil
+            _G.EggESP.PetRestoreUseJumpPower = nil
+            _G.EggESP.PetRestoreJumpPower = nil
+            _G.EggESP.PetRestoreJumpHeight = nil
+        end
+    end
+end)
